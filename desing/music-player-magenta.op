@@ -1,0 +1,645 @@
+{
+  "version": "0.8.4",
+  "name": "OpenPencil CLI Session",
+  "children": [
+    {
+      "type": "frame",
+      "id": "n1",
+      "name": "Music — Library view",
+      "width": 960.0,
+      "height": 640.0,
+      "layout": "vertical",
+      "gap": 14.0,
+      "padding": 24.0,
+      "fill": [
+        {
+          "type": "solid",
+          "color": "#08070A"
+        }
+      ],
+      "children": [
+        {
+          "type": "frame",
+          "id": "n2",
+          "name": "Header",
+          "width": "fill_container",
+          "height": 60.0,
+          "layout": "horizontal",
+          "gap": 20.0,
+          "padding": 12.0,
+          "fill": [
+            {
+              "type": "solid",
+              "color": "#08070A"
+            }
+          ],
+          "stroke": {
+            "thickness": 1.0,
+            "fill": [
+              {
+                "type": "solid",
+                "color": "#383039"
+              }
+            ]
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "n3",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "MUSIC",
+              "fontFamily": "Consolas",
+              "fontSize": 24.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#F08ACB"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "n4",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "LOCAL LIBRARY   D:/Music",
+              "fontFamily": "Consolas",
+              "fontSize": 16.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#ACA5B0"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "n5",
+          "name": "Library content",
+          "width": "fill_container",
+          "height": 355.0,
+          "layout": "horizontal",
+          "gap": 12.0,
+          "fill": [
+            {
+              "type": "solid",
+              "color": "#08070A"
+            }
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "n6",
+              "name": "Folders pane",
+              "width": 305.0,
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 12.0,
+              "padding": 16.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#111015"
+                }
+              ],
+              "stroke": {
+                "thickness": 1.0,
+                "fill": [
+                  {
+                    "type": "solid",
+                    "color": "#383039"
+                  }
+                ]
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "n7",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "FOLDERS / PLAYLISTS",
+                  "fontFamily": "Consolas",
+                  "fontSize": 17.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#F08ACB"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n8",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "▸  Rock                  3",
+                  "fontFamily": "Consolas",
+                  "fontSize": 17.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#E2E8F0"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n9",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "   Jazz                  2",
+                  "fontFamily": "Consolas",
+                  "fontSize": 17.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#ACA5B0"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n10",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "   Focus                 8",
+                  "fontFamily": "Consolas",
+                  "fontSize": 17.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#ACA5B0"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n11",
+                  "width": 48.0,
+                  "height": 20.0,
+                  "content": "",
+                  "fontFamily": "Consolas",
+                  "fontSize": 15.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#E2E8F0"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n12",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "c  Create   r  Rename",
+                  "fontFamily": "Consolas",
+                  "fontSize": 15.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#ACA5B0"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n13",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "x  Move to Recycle Bin",
+                  "fontFamily": "Consolas",
+                  "fontSize": 15.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#FBBF24"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "n14",
+              "name": "Tracks pane",
+              "width": 595.0,
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 12.0,
+              "padding": 16.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#111015"
+                }
+              ],
+              "stroke": {
+                "thickness": 1.0,
+                "fill": [
+                  {
+                    "type": "solid",
+                    "color": "#383039"
+                  }
+                ]
+              },
+              "children": [
+                {
+                  "type": "text",
+                  "id": "n15",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "ROCK  ·  3 TRACKS",
+                  "fontFamily": "Consolas",
+                  "fontSize": 17.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#F08ACB"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n16",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "   01  Intro.mp3",
+                  "fontFamily": "Consolas",
+                  "fontSize": 18.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#E2E8F0"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n17",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "▶  02  Another song.mp3",
+                  "fontFamily": "Consolas",
+                  "fontSize": 18.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#F08ACB"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n18",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "   03  Last track.mp3",
+                  "fontFamily": "Consolas",
+                  "fontSize": 18.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#E2E8F0"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "n36",
+                  "name": "Track rename hint",
+                  "width": "fit_content",
+                  "height": "fit_content",
+                  "content": "r  Rename track",
+                  "fontFamily": "Consolas",
+                  "fontSize": 15.0,
+                  "fill": [
+                    {
+                      "type": "solid",
+                      "color": "#ACA5B0"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "n19",
+          "name": "Now playing",
+          "width": "fill_container",
+          "height": 103.0,
+          "layout": "vertical",
+          "gap": 12.0,
+          "padding": 16.0,
+          "fill": [
+            {
+              "type": "solid",
+              "color": "#111015"
+            }
+          ],
+          "stroke": {
+            "thickness": 1.0,
+            "fill": [
+              {
+                "type": "solid",
+                "color": "#383039"
+              }
+            ]
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "n20",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "NOW PLAYING   Another song.mp3",
+              "fontFamily": "Consolas",
+              "fontSize": 18.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#F08ACB"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "n21",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "01:24   ━━━━━━━━━●━━━━━━━━━━━━━━━━━━━━   03:42",
+              "fontFamily": "Consolas",
+              "fontSize": 17.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#E2E8F0"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "n22",
+          "name": "Keyboard help",
+          "width": "fill_container",
+          "height": 55.0,
+          "layout": "horizontal",
+          "gap": 12.0,
+          "padding": 10.0,
+          "fill": [
+            {
+              "type": "solid",
+              "color": "#08070A"
+            }
+          ],
+          "stroke": {
+            "thickness": 1.0,
+            "fill": [
+              {
+                "type": "solid",
+                "color": "#383039"
+              }
+            ]
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "n23",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "↑↓ Move   Tab Switch panel   Enter Play   Space Pause",
+              "fontFamily": "Consolas",
+              "fontSize": 15.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#ACA5B0"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "n24",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "n Next   p Previous   s Stop   q Quit",
+              "fontFamily": "Consolas",
+              "fontSize": 15.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#ACA5B0"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "n25",
+      "name": "Music — Confirm move to Recycle Bin",
+      "x": 1000.0,
+      "y": 0.0,
+      "width": 960.0,
+      "height": 640.0,
+      "layout": "vertical",
+      "gap": 20.0,
+      "padding": 24.0,
+      "fill": [
+        {
+          "type": "solid",
+          "color": "#08070A"
+        }
+      ],
+      "children": [
+        {
+          "type": "frame",
+          "id": "n26",
+          "name": "Dialog context",
+          "width": "fill_container",
+          "height": 60.0,
+          "layout": "horizontal",
+          "gap": 20.0,
+          "padding": 12.0,
+          "fill": [
+            {
+              "type": "solid",
+              "color": "#08070A"
+            }
+          ],
+          "stroke": {
+            "thickness": 1.0,
+            "fill": [
+              {
+                "type": "solid",
+                "color": "#383039"
+              }
+            ]
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "n27",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "MUSIC",
+              "fontFamily": "Consolas",
+              "fontSize": 24.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#F08ACB"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "n28",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "LOCAL LIBRARY   D:/Music",
+              "fontFamily": "Consolas",
+              "fontSize": 16.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#ACA5B0"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "n29",
+          "name": "Confirmation dialog",
+          "width": "fill_container",
+          "height": 355.0,
+          "layout": "vertical",
+          "gap": 24.0,
+          "padding": 38.0,
+          "fill": [
+            {
+              "type": "solid",
+              "color": "#111015"
+            }
+          ],
+          "stroke": {
+            "thickness": 1.0,
+            "fill": [
+              {
+                "type": "solid",
+                "color": "#383039"
+              }
+            ]
+          },
+          "children": [
+            {
+              "type": "text",
+              "id": "n30",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "MOVE PLAYLIST TO RECYCLE BIN?",
+              "fontFamily": "Consolas",
+              "fontSize": 25.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#FBBF24"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "n31",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "Rock  ·  3 MP3 files",
+              "fontFamily": "Consolas",
+              "fontSize": 20.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#E2E8F0"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "n32",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "This moves the folder and its contents to the Windows Recycle Bin.",
+              "fontFamily": "Consolas",
+              "fontSize": 17.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#ACA5B0"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "n33",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "The music library root cannot be removed.",
+              "fontFamily": "Consolas",
+              "fontSize": 17.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#ACA5B0"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "n34",
+              "width": "fit_content",
+              "height": "fit_content",
+              "content": "[ Cancel (default) ]              [ Move to Recycle Bin ]",
+              "fontFamily": "Consolas",
+              "fontSize": 18.0,
+              "fill": [
+                {
+                  "type": "solid",
+                  "color": "#F08ACB"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "n35",
+          "width": "fit_content",
+          "height": "fit_content",
+          "content": "Enter Confirm selection     Esc Cancel     No permanent delete",
+          "fontFamily": "Consolas",
+          "fontSize": 16.0,
+          "fill": [
+            {
+              "type": "solid",
+              "color": "#ACA5B0"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "editorMeta": {
+    "activePageIndex": 0,
+    "preserveAuthoredGeometry": false
+  }
+}
