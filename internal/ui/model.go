@@ -37,7 +37,20 @@ func awaitPlayback(p Player) tea.Cmd {
 	}
 }
 
+// Manager applies validated library mutations; playback remains independent.
+type Manager interface {
+	CreatePlaylist(string) error
+	RenamePlaylist(string, string) error
+	RenameTrack(string, string, string) error
+}
+
 type Model struct {
+	Manager        Manager
+	Scan           func(string) (library.Library, error)
+	DialogKind     string
+	DialogInput    string
+	dialogFolder   string
+	dialogTrack    string
 	Root           string
 	Library        library.Library
 	RootError      error
@@ -76,6 +89,62 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	key, ok := msg.(tea.KeyPressMsg)
 	if !ok {
+		return m, nil
+	}
+	if m.DialogKind != "" {
+		switch key.String() {
+		case "esc":
+			m.DialogKind = ""
+			m.DialogInput = ""
+			m.Feedback = ""
+		case "backspace":
+			if len(m.DialogInput) > 0 {
+				r := []rune(m.DialogInput)
+				m.DialogInput = string(r[:len(r)-1])
+			}
+		case "enter":
+			if m.Manager == nil {
+				m.Feedback = "library manager unavailable"
+				break
+			}
+			var err error
+			switch m.DialogKind {
+			case "create":
+				err = m.Manager.CreatePlaylist(m.DialogInput)
+			case "folder":
+				err = m.Manager.RenamePlaylist(m.dialogFolder, m.DialogInput)
+			case "track":
+				err = m.Manager.RenameTrack(m.dialogFolder, m.dialogTrack, m.DialogInput)
+			}
+			if err != nil {
+				m.report(err)
+				break
+			}
+			m.DialogKind = ""
+			m.DialogInput = ""
+			if m.Scan == nil {
+				m.Feedback = "library scan unavailable"
+				break
+			}
+			snapshot, scanErr := m.Scan(m.Root)
+			m.RootError = scanErr
+			if scanErr != nil {
+				m.report(scanErr)
+				break
+			}
+			m.Library = snapshot
+			// A changed sort order invalidates old numeric selections.
+			m.FolderIndex, m.SelectedFolder, m.TrackIndex = 0, 0, 0
+			m.Feedback = ""
+		default:
+			if key.Mod == 0 && key.Text != "" {
+				for _, r := range key.Text {
+					if r >= 32 && r != 127 {
+						m.DialogInput += string(r)
+					}
+				}
+			}
+		}
 		return m, nil
 	}
 	switch key.String() {
@@ -117,6 +186,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else if tracks := m.tracks(); len(tracks) > 0 && m.Player != nil {
 			folder := m.Library.Playlists[m.SelectedFolder]
 			m.report(m.Player.Play(filepath.Join(m.Root, folder.Name), tracks, tracks[m.TrackIndex]))
+		}
+	case "c":
+		if !m.TracksFocused && m.RootError == nil && m.Manager != nil {
+			m.DialogKind = "create"
+			m.DialogInput = ""
+		}
+	case "r":
+		if m.RootError == nil && m.Manager != nil && len(m.Library.Playlists) > 0 {
+			if m.TracksFocused {
+				if tracks := m.tracks(); len(tracks) > 0 {
+					m.dialogFolder = m.Library.Playlists[m.SelectedFolder].Name
+					m.dialogTrack = tracks[m.TrackIndex]
+					m.DialogKind = "track"
+					m.DialogInput = strings.TrimSuffix(m.dialogTrack, filepath.Ext(m.dialogTrack))
+				}
+			} else {
+				m.dialogFolder = m.Library.Playlists[m.FolderIndex].Name
+				m.DialogKind = "folder"
+				m.DialogInput = m.dialogFolder
+			}
 		}
 	case "n":
 		if m.Player != nil {
@@ -238,10 +327,13 @@ func (m Model) View() tea.View {
 	} else {
 		fmt.Fprintln(&b, clipText("Now playing: stopped", width))
 	}
+	if m.DialogKind != "" {
+		fmt.Fprintln(&b, clipText("Dialog "+m.DialogKind+": "+safeText(m.DialogInput)+" (Enter apply · Esc cancel)", width))
+	}
 	if m.Feedback != "" {
 		fmt.Fprintln(&b, clipText("Error: "+safeText(m.Feedback), width))
 	}
-	b.WriteString(clipText("Tab switch pane · ↑/↓ navigate · Enter select/play · Space pause/resume · n/p next/previous · s stop · q quit", width))
+	b.WriteString(clipText("Tab switch pane · ↑/↓ navigate · Enter select/play · c create · r rename · Space pause/resume · n/p next/previous · s stop · q quit", width))
 	v := tea.NewView(b.String())
 	v.AltScreen = true
 	return v

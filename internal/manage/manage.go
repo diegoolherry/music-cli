@@ -146,8 +146,8 @@ func (s *Service) RenameTrack(folder, file, base string) error {
 	if !info.Mode().IsRegular() {
 		return fmt.Errorf("track %q is not a regular MP3", old)
 	}
-	if active := s.activePath(); active != "" && samePath(active, old) {
-		return fmt.Errorf("track %q is active; stop playback before renaming", old)
+	if active := s.activePath(); active != "" && samePath(filepath.Dir(active), parent) {
+		return fmt.Errorf("track %q is in the active playback folder; stop playback before renaming", old)
 	}
 	target := base + ".mp3"
 	if err := available(parent, target); err != nil {

@@ -81,11 +81,13 @@ func TestRenameTrackWithPlaybackEngine(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if err := service.RenameTrack("Rock", "Song.mp3", "Blocked"); err == nil || !strings.Contains(err.Error(), "active") {
-				t.Fatalf("active rename error = %v", err)
-			}
-			if _, err := os.Stat(filepath.Join(folder, "Song.mp3")); err != nil {
-				t.Fatalf("active track changed: %v", err)
+			for _, track := range []string{"Song.mp3", "Other.mp3"} {
+				if err := service.RenameTrack("Rock", track, "Blocked"); err == nil || !strings.Contains(err.Error(), "active") {
+					t.Fatalf("rename %q during %s error = %v", track, tc.name, err)
+				}
+				if _, err := os.Stat(filepath.Join(folder, track)); err != nil {
+					t.Fatalf("queued track %q changed: %v", track, err)
+				}
 			}
 			if _, err := os.Stat(filepath.Join(folder, "Blocked.mp3")); !os.IsNotExist(err) {
 				t.Fatalf("blocked target exists: %v", err)
@@ -104,17 +106,23 @@ func TestRenameTrackWithPlaybackEngine(t *testing.T) {
 	if err := service.RenamePlaylist("Jazz", "Blues"); err != nil {
 		t.Fatalf("inactive playlist rename: %v", err)
 	}
-	if err := service.RenameTrack("Rock", "Other.mp3", "OtherNew"); err != nil {
-		t.Fatalf("nonactive rename: %v", err)
+	if err := os.WriteFile(filepath.Join(root, "Blues", "Elsewhere.mp3"), []byte("other folder"), 0600); err != nil {
+		t.Fatal(err)
 	}
-	if _, err := os.Stat(filepath.Join(folder, "OtherNew.mp3")); err != nil {
-		t.Fatalf("nonactive target: %v", err)
+	if err := service.RenameTrack("Blues", "Elsewhere.mp3", "OtherNew"); err != nil {
+		t.Fatalf("other-folder rename: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "Blues", "OtherNew.mp3")); err != nil {
+		t.Fatalf("other-folder target: %v", err)
 	}
 	if err := engine.Stop(); err != nil {
 		t.Fatal(err)
 	}
 	if !backend.stream.closed || engine.ActivePath() != "" {
 		t.Fatal("Stop did not release active stream")
+	}
+	if err := service.RenameTrack("Rock", "Other.mp3", "QueuedReleased"); err != nil {
+		t.Fatalf("queued rename after Stop: %v", err)
 	}
 	if err := service.RenameTrack("Rock", "Song.mp3", "Released"); err != nil {
 		t.Fatalf("rename after Stop: %v", err)
