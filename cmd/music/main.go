@@ -76,7 +76,9 @@ func runControls(engine controlEngine, inputs <-chan string, stderr, stdout io.W
 		case value, ok := <-inputs:
 			if !ok {
 				showPending()
-				_ = engine.Stop()
+				if err := engine.Stop(); err != nil {
+					fmt.Fprintln(stderr, err)
+				}
 				showPending()
 				return
 			}
@@ -97,7 +99,9 @@ func runControls(engine controlEngine, inputs <-chan string, stderr, stdout io.W
 			err = engine.Stop()
 		case "q":
 			showPending()
-			_ = engine.Stop()
+			if err := engine.Stop(); err != nil {
+				fmt.Fprintln(stderr, err)
+			}
 			showPending()
 			return
 		default:

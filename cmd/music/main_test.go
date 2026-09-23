@@ -10,6 +10,7 @@ import (
 type controlFake struct {
 	notifications chan error
 	onStop        func()
+	stopErr       error
 }
 
 func (f *controlFake) Errors() <-chan error { return f.notifications }
@@ -17,7 +18,7 @@ func (f *controlFake) Stop() error {
 	if f.onStop != nil {
 		f.onStop()
 	}
-	return nil
+	return f.stopErr
 }
 func (f *controlFake) Next() error     { return nil }
 func (f *controlFake) Previous() error { return nil }
@@ -39,6 +40,25 @@ func TestControlFinalDrainAfterStop(t *testing.T) {
 			runControls(f, tc.input, &stderr, &stdout)
 			if !strings.Contains(stderr.String(), "playback: late failure") {
 				t.Fatalf("lost stop-boundary error: %q", stderr.String())
+			}
+		})
+	}
+}
+
+func TestControlReportsSynchronousStopErrorOnExit(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		input chan string
+	}{
+		{"quit", func() chan string { c := make(chan string, 1); c <- "q"; return c }()},
+		{"eof", func() chan string { c := make(chan string); close(c); return c }()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := &controlFake{notifications: make(chan error, 1), stopErr: errors.New("release failed")}
+			var stderr, stdout bytes.Buffer
+			runControls(f, tc.input, &stderr, &stdout)
+			if !strings.Contains(stderr.String(), "release failed") {
+				t.Fatalf("lost synchronous stop error: %q", stderr.String())
 			}
 		})
 	}
