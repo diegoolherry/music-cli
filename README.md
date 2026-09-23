@@ -1,13 +1,9 @@
-# Music CLI — playback compatibility probe (I1)
+# Music CLI — Windows music library (I3)
 
-This is **not yet the music player TUI**. It is a bounded Windows-first MP3 playback probe; browsing, library scanning, file management, and the TUI are deferred. No music file is modified.
+Run `music` to open the two-pane terminal library at the fixed `D:\Music` root. Immediate subfolders are playlists; only MP3 files directly inside each playlist appear. A loose MP3 directly under `D:\Music` is **not** a playlist track. The program never moves or changes music files. A missing or inaccessible root displays guidance; there is no root chooser.
 
-```text
-go test ./...
-go build ./...
-go run ./cmd/music "C:\path\to\01.mp3" "C:\path\to\02.mp3"
-```
+Build with `go build -o music.exe ./cmd/music`, then put the executable's directory on PATH to invoke `music` from CMD or PowerShell. This terminal/audio runtime has not yet been manually verified in either shell. Use Tab to switch panes, arrows to navigate, Enter to select a folder or play a track, Space to pause/resume, `n`/`p` for the active folder's ordered queue, `s` to stop/release, and `q` to quit/release. Folder creation, rename, and recycle controls are not yet implemented.
 
-Use your own licensed local MP3 files from the **same folder** and an available audio device. The first argument starts playback; the supplied filenames are sorted case-insensitively for next/previous and natural completion. Type `n`, `p`, `s`, or `q` followed by Enter; press Enter on an empty line to pause/resume. `s` releases the file; `q` exits. No wrap at queue edges. This probe has not been audibly verified without an actual MP3 and output device.
+To listen to an MP3 directly under `D:\Music` without moving it into a playlist, run `music --probe "D:\Music\your-song.mp3"` (or `go run ./cmd/music --probe "D:\Music\your-song.mp3"`). Supply multiple MP3 paths from the same folder for next/previous. The probe reads files without modifying them: type `n`, `p`, `s`, or `q` followed by Enter; an empty line pauses/resumes. Playback has not been audibly confirmed on the target machine.
 
-The device uses Oto v3.5.1 and go-mp3 v0.3.4 (unmaintained upstream). Oto has one process-wide sample rate; a subsequent file with a different rate fails explicitly rather than playing at the wrong speed. Restart the probe to play that file. Decoder/runtime/device compatibility remains subject to manual testing on target Windows versions. A read or device failure is not an audible success; asynchronous failures print to stderr without waiting for another command, including when the probe is stopped or quit.
+Oto v3.5.1 and go-mp3 v0.3.4 provide audio; go-mp3 is unmaintained upstream. Oto's process-wide sample rate means a later MP3 with another rate fails explicitly; restart the program for that track. Decoder, device, and Windows runtime compatibility require manual confirmation.
