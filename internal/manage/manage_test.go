@@ -1,6 +1,7 @@
 package manage
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -8,6 +9,170 @@ import (
 	"strings"
 	"testing"
 )
+
+func TestRecyclePlaylistBoundary(t *testing.T) {
+	root, s := fixture(t)
+	target := filepath.Join(root, "Rock")
+	calls := 0
+	s.Recycler = func(path string) error {
+		calls++
+		if filepath.Base(path) != "Rock" || filepath.Dir(filepath.Dir(path)) != root || filepath.Dir(path) == root {
+			t.Fatalf("staged path = %q, root %q", path, root)
+		}
+		return os.ErrPermission
+	}
+	for _, name := range []string{"..", "../Rock", ".", "missing"} {
+		if err := s.RecyclePlaylist(name); err == nil {
+			t.Errorf("accepted %q", name)
+		}
+	}
+	if calls != 0 {
+		t.Fatalf("invalid calls: %d", calls)
+	}
+	s.ActivePath = func() string { return filepath.Join(target, "Song.mp3") }
+	if err := s.RecyclePlaylist("Rock"); err == nil {
+		t.Fatal("active playlist accepted")
+	}
+	if calls != 0 {
+		t.Fatal("recycler called while active")
+	}
+	other := filepath.Join(root, "Other")
+	if err := os.Mkdir(other, 0700); err != nil {
+		t.Fatal(err)
+	}
+	s.ActivePath = func() string { return filepath.Join(other, "track.mp3") }
+	if err := s.RecyclePlaylist("Rock"); err == nil {
+		t.Fatal("fake failure hidden for other active folder")
+	}
+	if calls != 1 {
+		t.Fatalf("other-folder calls: %d", calls)
+	}
+	s.ActivePath = nil // Stop releases the active path.
+	if err := s.RecyclePlaylist("Rock"); err == nil {
+		t.Fatal("fake failure hidden")
+	}
+	if calls != 2 {
+		t.Fatalf("calls: %d", calls)
+	}
+	if _, err := os.Stat(target); err != nil {
+		t.Fatalf("source lost: %v", err)
+	}
+	link := filepath.Join(root, "Link")
+	if err := os.Symlink(target, link); err == nil {
+		if err := s.RecyclePlaylist("Link"); err == nil {
+			t.Fatal("symlink accepted")
+		}
+	}
+}
+
+func TestRecycleRestoreOccupiedAfterCheck(t *testing.T) {
+	root, s := fixture(t)
+	cause := errors.New("recycler failed")
+	var staged string
+	s.Recycler = func(path string) error { staged = path; return cause }
+	s.beforeRestore = func() {
+		original := filepath.Join(root, "Rock")
+		if err := os.Mkdir(original, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(original, "marker"), []byte("new"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	err := s.RecyclePlaylist("Rock")
+	if !errors.Is(err, cause) || !strings.Contains(err.Error(), "restore playlist") {
+		t.Fatalf("error = %v", err)
+	}
+	marker, readErr := os.ReadFile(filepath.Join(root, "Rock", "marker"))
+	if readErr != nil || string(marker) != "new" {
+		t.Fatalf("occupied destination changed: %q, %v", marker, readErr)
+	}
+	song, readErr := os.ReadFile(filepath.Join(staged, "Song.mp3"))
+	if readErr != nil || string(song) != "song" {
+		t.Fatalf("staged payload changed: %q, %v", song, readErr)
+	}
+}
+
+func TestRecycleCaptureReplacementAndSuccess(t *testing.T) {
+	t.Run("replacement is never recycled", func(t *testing.T) {
+		root, s := fixture(t)
+		original := filepath.Join(root, "Rock")
+		displaced := filepath.Join(root, "Displaced")
+		s.beforeCapture = func() {
+			if err := os.Rename(original, displaced); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Mkdir(original, 0700); err != nil {
+				t.Fatal(err)
+			}
+		}
+		s.Recycler = func(string) error { t.Fatal("recycled replacement"); return nil }
+		if err := s.RecyclePlaylist("Rock"); err == nil || !strings.Contains(err.Error(), "identity mismatch") {
+			t.Fatalf("error = %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(displaced, "Song.mp3")); err != nil {
+			t.Fatal(err)
+		}
+		entries, err := os.ReadDir(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) != 2 {
+			t.Fatalf("expected restored replacement and displaced original: %v", entries)
+		}
+	})
+	t.Run("success moves staged payload", func(t *testing.T) {
+		root, s := fixture(t)
+		outside := filepath.Join(t.TempDir(), "recycled")
+		s.Recycler = func(path string) error {
+			if filepath.Base(path) != "Rock" || filepath.Dir(filepath.Dir(path)) != root {
+				t.Fatalf("path = %q", path)
+			}
+			return os.Rename(path, outside)
+		}
+		if err := s.RecyclePlaylist("Rock"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := os.Stat(filepath.Join(outside, "Song.mp3")); err != nil {
+			t.Fatal(err)
+		}
+		entries, err := os.ReadDir(root)
+		if err != nil || len(entries) != 0 {
+			t.Fatalf("staging residue: %v, %v", entries, err)
+		}
+	})
+	t.Run("success without removal is rejected", func(t *testing.T) {
+		root, s := fixture(t)
+		s.Recycler = func(string) error { return nil }
+		if err := s.RecyclePlaylist("Rock"); err == nil {
+			t.Fatal("false success")
+		}
+		if info, err := os.Stat(filepath.Join(root, "Rock")); err != nil || !info.IsDir() {
+			t.Fatalf("original playlist not restored: %v, %v", info, err)
+		}
+		if _, err := os.Stat(filepath.Join(root, "Rock", "Song.mp3")); err != nil {
+			t.Fatalf("original song not restored: %v", err)
+		}
+		entries, err := os.ReadDir(root)
+		if err != nil || len(entries) != 1 || entries[0].Name() != "Rock" {
+			t.Fatalf("staging residue or missing original: %v, %v", entries, err)
+		}
+	})
+	t.Run("failure restores contents", func(t *testing.T) {
+		root, s := fixture(t)
+		s.Recycler = func(string) error { return os.ErrPermission }
+		if err := s.RecyclePlaylist("Rock"); !errors.Is(err, os.ErrPermission) {
+			t.Fatalf("error = %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(root, "Rock", "Song.mp3")); err != nil {
+			t.Fatal(err)
+		}
+		entries, err := os.ReadDir(root)
+		if err != nil || len(entries) != 1 {
+			t.Fatalf("staging residue: %v, %v", entries, err)
+		}
+	})
+}
 
 func fixture(t *testing.T) (string, *Service) {
 	t.Helper()
