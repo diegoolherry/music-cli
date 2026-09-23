@@ -72,6 +72,16 @@ func (e *Engine) Current() string {
 	}
 	return e.tracks[e.index]
 }
+
+// ActivePath returns the path of the currently open stream, including while paused.
+func (e *Engine) ActivePath() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.stream == nil {
+		return ""
+	}
+	return filepath.Join(e.folder, e.tracks[e.index])
+}
 func (e *Engine) Err() error { e.mu.Lock(); defer e.mu.Unlock(); return e.lastError }
 func (e *Engine) stop() error {
 	e.generation++
