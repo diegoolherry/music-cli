@@ -54,6 +54,10 @@ type fakeManager struct {
 	err   error
 }
 
+func (f *fakeManager) RecyclePlaylist(name string) error {
+	f.calls = append(f.calls, "recycle:"+name)
+	return f.err
+}
 func (f *fakeManager) CreatePlaylist(name string) error {
 	f.calls = append(f.calls, "create:"+name)
 	return f.err
@@ -65,6 +69,85 @@ func (f *fakeManager) RenamePlaylist(old, name string) error {
 func (f *fakeManager) RenameTrack(folder, file, base string) error {
 	f.calls = append(f.calls, "track:"+folder+":"+file+":"+base)
 	return f.err
+}
+
+func TestRecycleConfirmation(t *testing.T) {
+	manager := &fakeManager{}
+	p := &fakePlayer{}
+	m := New("root", sample(), nil, p)
+	m.Manager = manager
+	scans := 0
+	m.Scan = func(string) (library.Library, error) {
+		scans++
+		return library.Library{Playlists: []library.Playlist{{Name: "B"}}}, nil
+	}
+	m = press(m, "x")
+	if m.DialogKind != "recycle" || !strings.Contains(m.View().Content, "A") || !strings.Contains(m.View().Content, "Recycle Bin") || !strings.Contains(m.View().Content, "Cancel") {
+		t.Fatalf("dialog: %+v %q", m, m.View().Content)
+	}
+	for _, key := range []string{"x", "q", "tab", "n", "s", " ", "backspace"} {
+		m = press(m, key)
+	}
+	if m.DialogKind != "recycle" || m.TracksFocused || len(p.calls) != 0 || len(manager.calls) != 0 {
+		t.Fatalf("key leak: %+v", m)
+	}
+	m = press(m, "enter")
+	if m.DialogKind != "" || len(manager.calls) != 0 {
+		t.Fatalf("default cancel: %+v", m)
+	}
+	m = press(m, "x")
+	m = press(m, "down")
+	m = press(m, "enter")
+	if strings.Join(manager.calls, ",") != "recycle:A" || scans != 1 || m.DialogKind != "" || len(m.Library.Playlists) != 1 || m.Library.Playlists[0].Name != "B" || m.FolderIndex != 0 || m.SelectedFolder != 0 || m.Feedback != "" {
+		t.Fatalf("move: %+v %+v", m, manager)
+	}
+}
+
+func TestRecycleRepeatedEnterAfterFailure(t *testing.T) {
+	manager := &fakeManager{err: errors.New("failed")}
+	m := New("root", sample(), nil, nil)
+	m.Manager = manager
+	m = press(press(m, "x"), "down")
+	m = press(m, "enter")
+	if m.DialogKind != "recycle" || m.recycleMove || !strings.Contains(m.View().Content, "[Cancel]") || !strings.Contains(m.View().Content, "Error: failed") {
+		t.Fatalf("failure should remain visible with Cancel selected: %+v %q", m, m.View().Content)
+	}
+	m = press(m, "enter")
+	if m.DialogKind != "" || m.Feedback != "" || strings.Join(manager.calls, ",") != "recycle:A" {
+		t.Fatalf("second Enter should deliberately cancel without retry: %+v %+v", m, manager)
+	}
+}
+
+func TestRecycleFailureAndGuards(t *testing.T) {
+	manager := &fakeManager{err: errors.New("failed\x1b[2J")}
+	m := New("root", sample(), nil, nil)
+	m.Manager = manager
+	m.Scan = func(string) (library.Library, error) { return library.Library{}, errors.New("scan\x1b[2J") }
+	m = press(press(press(m, "x"), "up"), "enter")
+	if m.DialogKind != "recycle" || !strings.Contains(m.Feedback, "failed") || strings.Contains(m.View().Content, "\x1b[2J") {
+		t.Fatalf("failure: %+v", m)
+	}
+	m = press(m, "esc")
+	if len(manager.calls) != 1 {
+		t.Fatal(manager.calls)
+	}
+	manager.err = nil
+	m = press(press(press(m, "x"), "down"), "enter")
+	if m.DialogKind != "" || !strings.Contains(m.Feedback, "scan") || strings.Contains(m.View().Content, "\x1b[2J") || m.Library.Playlists[0].Name != "A" {
+		t.Fatalf("scan failure: %+v", m)
+	}
+	for _, guarded := range []Model{New("root", sample(), errors.New("root unavailable"), nil), New("root", library.Library{}, nil, nil)} {
+		guarded.Manager = manager
+		if press(guarded, "x").DialogKind != "" {
+			t.Fatal("unsafe dialog")
+		}
+	}
+	m = New("root", sample(), nil, nil)
+	m.Manager = manager
+	m.TracksFocused = true
+	if press(m, "x").DialogKind != "" {
+		t.Fatal("track pane dialog")
+	}
 }
 
 func TestDialogsMutationAndRefresh(t *testing.T) {
@@ -328,7 +411,8 @@ func TestEmptyErrorAndUnsupported(t *testing.T) {
 	if !strings.Contains(m.View().Content, "device unavailable") || p.current != "" {
 		t.Fatal(m.View().Content)
 	}
-	if !strings.Contains(m.View().Content, " c create ") || strings.Contains(m.View().Content, " x ") {
+	m.Width = 180
+	if !strings.Contains(m.View().Content, " c create ") || !strings.Contains(m.View().Content, " x recycle ") {
 		t.Fatal("incorrect controls advertised")
 	}
 }

@@ -41,6 +41,7 @@ func awaitPlayback(p Player) tea.Cmd {
 type Manager interface {
 	CreatePlaylist(string) error
 	RenamePlaylist(string, string) error
+	RecyclePlaylist(string) error
 	RenameTrack(string, string, string) error
 }
 
@@ -51,6 +52,7 @@ type Model struct {
 	DialogInput    string
 	dialogFolder   string
 	dialogTrack    string
+	recycleMove    bool
 	Root           string
 	Library        library.Library
 	RootError      error
@@ -89,6 +91,47 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	key, ok := msg.(tea.KeyPressMsg)
 	if !ok {
+		return m, nil
+	}
+	if m.DialogKind == "recycle" {
+		switch key.String() {
+		case "esc":
+			m.DialogKind = ""
+			m.Feedback = ""
+		case "up", "down":
+			m.recycleMove = !m.recycleMove
+		case "enter":
+			if !m.recycleMove {
+				m.DialogKind = ""
+				m.Feedback = ""
+				break
+			}
+			if m.Manager == nil || m.RootError != nil || m.TracksFocused || m.dialogFolder == "" {
+				m.Feedback = "playlist recycling unavailable"
+				break
+			}
+			if err := m.Manager.RecyclePlaylist(m.dialogFolder); err != nil {
+				m.report(err)
+				m.recycleMove = false
+				break
+			}
+			m.DialogKind = ""
+			if m.Scan == nil {
+				m.Feedback = "library scan unavailable; refresh before further changes"
+				m.RootError = fmt.Errorf("library scan unavailable")
+				break
+			}
+			snapshot, err := m.Scan(m.Root)
+			if err != nil {
+				m.RootError = err
+				m.report(err)
+				break
+			}
+			m.Library = snapshot
+			m.RootError = nil
+			m.FolderIndex, m.SelectedFolder, m.TrackIndex = 0, 0, 0
+			m.Feedback = ""
+		}
 		return m, nil
 	}
 	if m.DialogKind != "" {
@@ -206,6 +249,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.DialogKind = "folder"
 				m.DialogInput = m.dialogFolder
 			}
+		}
+	case "x":
+		if !m.TracksFocused && m.RootError == nil && m.Manager != nil && len(m.Library.Playlists) > 0 {
+			m.FolderIndex = clamp(m.FolderIndex, len(m.Library.Playlists))
+			m.dialogFolder = m.Library.Playlists[m.FolderIndex].Name
+			m.recycleMove = false
+			m.DialogKind = "recycle"
+			m.Feedback = ""
 		}
 	case "n":
 		if m.Player != nil {
@@ -327,13 +378,20 @@ func (m Model) View() tea.View {
 	} else {
 		fmt.Fprintln(&b, clipText("Now playing: stopped", width))
 	}
-	if m.DialogKind != "" {
+	if m.DialogKind == "recycle" {
+		fmt.Fprintln(&b, clipText("Move playlist "+safeText(m.dialogFolder)+" and its contents to Windows Recycle Bin?", width))
+		choices := "[Cancel]   Move"
+		if m.recycleMove {
+			choices = "Cancel   [Move]"
+		}
+		fmt.Fprintln(&b, clipText(choices+" (↑/↓ choose · Enter confirm · Esc cancel)", width))
+	} else if m.DialogKind != "" {
 		fmt.Fprintln(&b, clipText("Dialog "+m.DialogKind+": "+safeText(m.DialogInput)+" (Enter apply · Esc cancel)", width))
 	}
 	if m.Feedback != "" {
 		fmt.Fprintln(&b, clipText("Error: "+safeText(m.Feedback), width))
 	}
-	b.WriteString(clipText("Tab switch pane · ↑/↓ navigate · Enter select/play · c create · r rename · Space pause/resume · n/p next/previous · s stop · q quit", width))
+	b.WriteString(clipText("Tab switch pane · ↑/↓ navigate · Enter select/play · c create · r rename · x recycle · Space pause/resume · n/p next/previous · s stop · q quit", width))
 	v := tea.NewView(b.String())
 	v.AltScreen = true
 	return v
