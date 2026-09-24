@@ -2,6 +2,7 @@
 package manage
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,12 @@ import (
 type Service struct {
 	Root       string
 	ActivePath func() string
+	// Recycler overrides the platform recycler for tests. Nil selects the platform implementation.
+	Recycler func(string) error
+	// beforeCapture is a test seam for a replacement between validation and rename.
+	beforeCapture func()
+	// beforeRestore runs immediately before the atomic restoration attempt (test seam).
+	beforeRestore func()
 }
 
 func New(root string, activePath func() string) *Service {
@@ -124,6 +131,97 @@ func (s *Service) RenamePlaylist(oldName, newName string) error {
 	}
 	return nil
 }
+
+// RecyclePlaylist moves a real immediate playlist to the Recycle Bin or fails.
+func (s *Service) RecyclePlaylist(name string) error {
+	path, err := s.playlist(name)
+	if err != nil {
+		return err
+	}
+	if active := s.activePath(); active != "" && samePath(filepath.Dir(active), path) {
+		return fmt.Errorf("playlist %q is active; stop playback before recycling", path)
+	}
+	identity, err := os.Lstat(path)
+	if err != nil || !identity.IsDir() || identity.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("playlist identity unavailable: %v", err)
+	}
+	// Stat through a handle obtains a stable file ID on Windows; Lstat's
+	// path-only metadata does not provide one for os.SameFile.
+	handle, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("open playlist identity: %w", err)
+	}
+	identity, err = handle.Stat()
+	closeErr := handle.Close()
+	if err != nil {
+		return fmt.Errorf("stat playlist identity: %w", err)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("close playlist identity: %w", closeErr)
+	}
+	stage, err := os.MkdirTemp(s.Root, ".music-recycle-")
+	if err != nil {
+		return fmt.Errorf("create recycle staging: %w", err)
+	}
+	defer func() { _ = os.Remove(stage) }() // Only the app-owned empty container.
+	payload := filepath.Join(stage, name)
+	if s.beforeCapture != nil {
+		s.beforeCapture()
+	}
+	if err := os.Rename(path, payload); err != nil {
+		return fmt.Errorf("capture playlist: %w", err)
+	}
+	restore := func(cause error) error {
+		if _, err := os.Lstat(payload); err != nil {
+			if os.IsNotExist(err) {
+				return cause
+			}
+			return errors.Join(cause, fmt.Errorf("inspect staged playlist for restoration: %w", err))
+		}
+		if s.beforeRestore != nil {
+			s.beforeRestore()
+		}
+		if err := renameNoReplace(payload, path); err != nil {
+			return errors.Join(cause, fmt.Errorf("restore playlist: %w", err))
+		}
+		return cause
+	}
+	captured, err := os.Lstat(payload)
+	if err != nil || !captured.IsDir() || captured.Mode()&os.ModeSymlink != 0 {
+		return restore(fmt.Errorf("captured playlist identity mismatch: %v", err))
+	}
+	handle, err = os.Open(payload)
+	if err != nil {
+		return restore(fmt.Errorf("open captured identity: %w", err))
+	}
+	captured, err = handle.Stat()
+	closeErr = handle.Close()
+	if err != nil || closeErr != nil {
+		return restore(errors.Join(err, closeErr))
+	}
+	if !os.SameFile(identity, captured) {
+		return restore(fmt.Errorf("captured playlist identity mismatch"))
+	}
+	absolute, err := filepath.Abs(payload)
+	if err != nil {
+		return restore(err)
+	}
+	recycle := s.Recycler
+	if recycle == nil {
+		recycle = recycleDirectory
+	}
+	if err := recycle(absolute); err != nil {
+		return restore(fmt.Errorf("recycle playlist %q: %w", path, err))
+	}
+	if _, err := os.Lstat(payload); !os.IsNotExist(err) {
+		return restore(fmt.Errorf("recycle not confirmed: staged playlist remains or cannot be inspected: %v", err))
+	}
+	if err := os.Remove(stage); err != nil {
+		return fmt.Errorf("remove empty recycle staging: %w", err)
+	}
+	return nil
+}
+
 func (s *Service) RenameTrack(folder, file, base string) error {
 	parent, err := s.playlist(folder)
 	if err != nil {
