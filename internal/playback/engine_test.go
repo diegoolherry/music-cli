@@ -74,6 +74,45 @@ func TestPlaybackTransitions(t *testing.T) {
 		t.Fatal("stop must release file", err)
 	}
 }
+func TestActivePathLifecycle(t *testing.T) {
+	b := &fakeBackend{}
+	e := New(b)
+	folder := filepath.Join(t.TempDir(), "Rock")
+	check := func(want string) {
+		t.Helper()
+		if got := e.ActivePath(); got != want {
+			t.Fatalf("ActivePath() = %q, want %q", got, want)
+		}
+	}
+	check("")
+	if err := e.Play(folder, []string{"a.mp3", "b.mp3"}, "a.mp3"); err != nil {
+		t.Fatal(err)
+	}
+	check(filepath.Join(folder, "a.mp3"))
+	if err := e.Pause(); err != nil {
+		t.Fatal(err)
+	}
+	check(filepath.Join(folder, "a.mp3"))
+	if err := e.Next(); err != nil {
+		t.Fatal(err)
+	}
+	check(filepath.Join(folder, "b.mp3"))
+	b.finish()
+	check("")
+	if err := e.Play(folder, []string{"a.mp3"}, "a.mp3"); err != nil {
+		t.Fatal(err)
+	}
+	b.failRead(errors.New("read failed"))
+	check("")
+	if err := e.Play(folder, []string{"a.mp3"}, "a.mp3"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	check("")
+}
+
 func TestCompletionQueuedBeforePauseCannotAdvance(t *testing.T) {
 	b := &fakeBackend{}
 	e := New(b)

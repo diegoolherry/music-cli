@@ -1,4 +1,4 @@
-// Command music is a bounded audio probe; it does not browse or modify music files.
+// Command music browses the fixed Windows music library or runs an explicit audio probe.
 package main
 
 import (
@@ -9,28 +9,57 @@ import (
 	"path/filepath"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
+	"github.com/diegoolherry/music-cli/internal/library"
 	"github.com/diegoolherry/music-cli/internal/playback"
+	"github.com/diegoolherry/music-cli/internal/ui"
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: music <mp3 path> [mp3 path ...]")
-		os.Exit(2)
+	if err := run(os.Args[1:], launchUI, probe); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-	paths := os.Args[1:]
+}
+
+func run(args []string, launch func(string) error, probePaths func([]string) error) error {
+	if len(args) == 0 {
+		return launch(`D:\Music`)
+	}
+	if args[0] != "--probe" || len(args) < 2 {
+		return fmt.Errorf("usage: music [--probe <mp3 path> [mp3 path ...]]")
+	}
+	return probePaths(args[1:])
+}
+
+func launchUI(root string) error {
+	snapshot, scanErr := library.Scan(root)
+	engine := playback.New(&playback.Audio{})
+	result, runErr := tea.NewProgram(ui.New(root, snapshot, scanErr, engine)).Run()
+	if stopErr := engine.Stop(); stopErr != nil {
+		return fmt.Errorf("release playback: %w", stopErr)
+	}
+	if runErr != nil {
+		return runErr
+	}
+	if model, ok := result.(ui.Model); ok {
+		return model.QuitError
+	}
+	return nil
+}
+
+func probe(paths []string) error {
 	folder := filepath.Dir(paths[0])
 	names := make([]string, 0, len(paths))
 	for _, path := range paths {
 		if filepath.Dir(path) != folder {
-			fmt.Fprintln(os.Stderr, "all paths must be in one folder")
-			os.Exit(2)
+			return fmt.Errorf("all paths must be in one folder")
 		}
 		names = append(names, filepath.Base(path))
 	}
 	engine := playback.New(&playback.Audio{})
 	if err := engine.Play(folder, names, names[0]); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
 	fmt.Println("Audio probe: n next, p previous, space/Enter pause or resume, s stop, q quit. Natural end advances in folder.")
 	inputs := make(chan string)
@@ -45,6 +74,7 @@ func main() {
 		}
 	}()
 	runControls(engine, inputs, os.Stderr, os.Stdout)
+	return nil
 }
 
 type controlEngine interface {

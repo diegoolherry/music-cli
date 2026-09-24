@@ -14,10 +14,12 @@ import (
 )
 
 type fakePlayer struct {
-	current string
-	folder  string
-	calls   []string
-	fail    bool
+	current       string
+	folder        string
+	calls         []string
+	fail          bool
+	stopErr       error
+	notifications chan error
 }
 
 func (p *fakePlayer) Play(folder string, files []string, selected string) error {
@@ -33,13 +35,62 @@ func (p *fakePlayer) Current() string { return p.current }
 func (p *fakePlayer) Next() error     { p.calls = append(p.calls, "next"); return nil }
 func (p *fakePlayer) Previous() error { p.calls = append(p.calls, "previous"); return nil }
 func (p *fakePlayer) Pause() error    { p.calls = append(p.calls, "pause"); return nil }
-func (p *fakePlayer) Stop() error     { p.calls = append(p.calls, "stop"); p.current = ""; return nil }
+func (p *fakePlayer) Stop() error {
+	p.calls = append(p.calls, "stop")
+	p.current = ""
+	return p.stopErr
+}
+func (p *fakePlayer) Errors() <-chan error { return p.notifications }
 func press(m Model, key string) Model {
 	next, _ := m.Update(tea.KeyPressMsg{Text: key, Code: map[string]rune{" ": ' '}[key]})
 	return next.(Model)
 }
 func sample() library.Library {
 	return library.Library{Playlists: []library.Playlist{{Name: "A", Tracks: []string{"01.mp3", "02.mp3"}}, {Name: "B", Tracks: []string{"other.mp3"}}}}
+}
+func TestQuitReleasesAndReportsFailure(t *testing.T) {
+	p := &fakePlayer{current: "song.mp3", stopErr: errors.New("release failed")}
+	m := press(New(`D:\Music`, sample(), nil, p), "q")
+	if p.current != "" || !strings.Contains(m.Feedback, "release failed") {
+		t.Fatalf("quit: %+v %+v", p, m)
+	}
+}
+func TestCtrlCQuitsAndReleases(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		stopErr error
+	}{
+		{name: "successful release"},
+		{name: "failed release", stopErr: errors.New("release failed")},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &fakePlayer{current: "song.mp3", stopErr: tt.stopErr}
+			next, cmd := New(`D:\Music`, sample(), nil, p).Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+			m := next.(Model)
+			if len(p.calls) != 1 || p.calls[0] != "stop" || p.current != "" {
+				t.Fatalf("stop calls = %v, current = %q", p.calls, p.current)
+			}
+			if cmd == nil || cmd() == nil {
+				t.Fatal("expected tea.Quit command")
+			}
+			if m.QuitError != tt.stopErr {
+				t.Fatalf("quit error = %v, want %v", m.QuitError, tt.stopErr)
+			}
+			if tt.stopErr != nil && !strings.Contains(m.Feedback, tt.stopErr.Error()) {
+				t.Fatalf("feedback = %q", m.Feedback)
+			}
+		})
+	}
+}
+func TestIdlePlaybackFailure(t *testing.T) {
+	p := &fakePlayer{current: "song.mp3", notifications: make(chan error, 1)}
+	m := New(`D:\Music`, sample(), nil, p)
+	p.current = ""
+	next, _ := m.Update(playbackNotice{err: errors.New("device failed")})
+	m = next.(Model)
+	if !strings.Contains(m.View().Content, "device failed") || !strings.Contains(m.View().Content, "Now playing: stopped") {
+		t.Fatal(m.View().Content)
+	}
 }
 func TestNavigationAndActiveQueue(t *testing.T) {
 	p := &fakePlayer{}

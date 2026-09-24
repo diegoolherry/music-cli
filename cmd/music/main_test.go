@@ -25,6 +25,22 @@ func (f *controlFake) Previous() error { return nil }
 func (f *controlFake) Pause() error    { return nil }
 func (f *controlFake) Current() string { return "" }
 
+func TestRouteDefaultAndProbe(t *testing.T) {
+	var scanned, played bool
+	err := run(nil, func(root string) error { scanned = root == `D:\Music`; return errors.New("root inaccessible") }, func(paths []string) error { played = true; return nil })
+	if err == nil || !scanned || played {
+		t.Fatalf("default route: %v %v %v", err, scanned, played)
+	}
+	scanned, played = false, false
+	err = run([]string{"--probe", `D:\Music\sample.mp3`}, func(string) error { scanned = true; return nil }, func(paths []string) error { played = len(paths) == 1; return nil })
+	if err != nil || scanned || !played {
+		t.Fatalf("probe route: %v %v %v", err, scanned, played)
+	}
+	if err := run([]string{"song.mp3"}, nil, nil); err == nil {
+		t.Fatal("implicit probe accepted")
+	}
+}
+
 func TestControlFinalDrainAfterStop(t *testing.T) {
 	for _, tc := range []struct {
 		name  string

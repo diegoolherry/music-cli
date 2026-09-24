@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mattn/go-runewidth"
 
@@ -20,6 +21,20 @@ type Player interface {
 	Previous() error
 	Pause() error
 	Stop() error
+	Errors() <-chan error
+}
+
+type playbackNotice struct{ err error }
+
+func awaitPlayback(p Player) tea.Cmd {
+	return func() tea.Msg {
+		select {
+		case err := <-p.Errors():
+			return playbackNotice{err: err}
+		case <-time.After(150 * time.Millisecond):
+			return playbackNotice{}
+		}
+	}
 }
 
 type Model struct {
@@ -32,16 +47,31 @@ type Model struct {
 	SelectedFolder int
 	TracksFocused  bool
 	Feedback       string
+	QuitError      error
 	Width          int
 }
 
 func New(root string, snapshot library.Library, rootErr error, player Player) Model {
 	return Model{Root: root, Library: snapshot, RootError: rootErr, Player: player}
 }
-func (m Model) Init() tea.Cmd { return nil }
+func (m Model) Init() tea.Cmd {
+	if m.Player != nil {
+		return awaitPlayback(m.Player)
+	}
+	return nil
+}
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if size, ok := msg.(tea.WindowSizeMsg); ok {
 		m.Width = size.Width
+		return m, nil
+	}
+	if notice, ok := msg.(playbackNotice); ok {
+		if notice.err != nil {
+			m.Feedback = notice.err.Error()
+		}
+		if m.Player != nil {
+			return m, awaitPlayback(m.Player)
+		}
 		return m, nil
 	}
 	key, ok := msg.(tea.KeyPressMsg)
@@ -49,7 +79,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch key.String() {
-	case "q":
+	case "q", "ctrl+c":
+		if m.Player != nil {
+			m.QuitError = m.Player.Stop()
+			m.report(m.QuitError)
+			select {
+			case err := <-m.Player.Errors():
+				if err != nil {
+					m.Feedback = err.Error()
+					m.QuitError = err
+				}
+			default:
+			}
+		}
 		return m, tea.Quit
 	case "tab":
 		m.TracksFocused = !m.TracksFocused
