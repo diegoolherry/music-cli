@@ -48,6 +48,86 @@ func press(m Model, key string) Model {
 func sample() library.Library {
 	return library.Library{Playlists: []library.Playlist{{Name: "A", Tracks: []string{"01.mp3", "02.mp3"}}, {Name: "B", Tracks: []string{"other.mp3"}}}}
 }
+
+type fakeManager struct {
+	calls []string
+	err   error
+}
+
+func (f *fakeManager) CreatePlaylist(name string) error {
+	f.calls = append(f.calls, "create:"+name)
+	return f.err
+}
+func (f *fakeManager) RenamePlaylist(old, name string) error {
+	f.calls = append(f.calls, "folder:"+old+":"+name)
+	return f.err
+}
+func (f *fakeManager) RenameTrack(folder, file, base string) error {
+	f.calls = append(f.calls, "track:"+folder+":"+file+":"+base)
+	return f.err
+}
+
+func TestDialogsMutationAndRefresh(t *testing.T) {
+	manager := &fakeManager{}
+	scans := 0
+	m := New("root", sample(), nil, &fakePlayer{})
+	m.Manager = manager
+	m.Scan = func(string) (library.Library, error) {
+		scans++
+		return library.Library{Playlists: []library.Playlist{{Name: "Z"}}}, nil
+	}
+	m = press(m, "c")
+	if m.DialogInput != "" || m.DialogKind != "create" {
+		t.Fatalf("create dialog: %+v", m)
+	}
+	for _, key := range []string{"n", "q", "x", "backspace", "enter"} {
+		m = press(m, key)
+	}
+	if strings.Join(manager.calls, ",") != "create:nq" || scans != 1 || m.DialogKind != "" || m.FolderIndex != 0 || m.SelectedFolder != 0 {
+		t.Fatalf("create/refresh: %+v %+v", m, manager)
+	}
+	m = press(m, "r")
+	if m.DialogKind != "folder" || m.DialogInput != "Z" {
+		t.Fatalf("folder dialog: %+v", m)
+	}
+	m = press(m, "esc")
+	if len(manager.calls) != 1 {
+		t.Fatal(manager.calls)
+	}
+	m.Library = sample()
+	m = press(m, "tab")
+	m = press(m, "r")
+	if m.DialogKind != "track" || m.DialogInput != "01" {
+		t.Fatalf("track dialog: %+v", m)
+	}
+	m = press(m, "backspace")
+	m = press(m, "2")
+	m = press(m, "enter")
+	if manager.calls[1] != "track:A:01.mp3:02" || scans != 2 {
+		t.Fatalf("track: %+v %+v", m, manager)
+	}
+}
+
+func TestDialogErrorsAndKeyCapture(t *testing.T) {
+	p := &fakePlayer{}
+	manager := &fakeManager{err: errors.New("bad\x1b[2J")}
+	m := New("root", sample(), nil, p)
+	m.Manager = manager
+	m.Scan = func(string) (library.Library, error) { return library.Library{}, errors.New("scan\x1b[2J") }
+	m = press(m, "c")
+	for _, key := range []string{"tab", "down", " ", "s", "enter"} {
+		m = press(m, key)
+	}
+	if m.TracksFocused || m.FolderIndex != 0 || len(p.calls) != 0 || m.DialogKind == "" || strings.Contains(m.View().Content, "\x1b[2J") {
+		t.Fatalf("dialog leaked: %+v", m)
+	}
+	manager.err = nil
+	m = press(m, "enter")
+	if m.DialogKind != "" || !strings.Contains(m.Feedback, "scan") || strings.Contains(m.View().Content, "\x1b[2J") {
+		t.Fatalf("scan error: %+v", m)
+	}
+}
+
 func TestQuitReleasesAndReportsFailure(t *testing.T) {
 	p := &fakePlayer{current: "song.mp3", stopErr: errors.New("release failed")}
 	m := press(New(`D:\Music`, sample(), nil, p), "q")
@@ -248,7 +328,7 @@ func TestEmptyErrorAndUnsupported(t *testing.T) {
 	if !strings.Contains(m.View().Content, "device unavailable") || p.current != "" {
 		t.Fatal(m.View().Content)
 	}
-	if strings.Contains(m.View().Content, " c ") || strings.Contains(m.View().Content, " x ") {
-		t.Fatal("unsupported controls advertised")
+	if !strings.Contains(m.View().Content, " c create ") || strings.Contains(m.View().Content, " x ") {
+		t.Fatal("incorrect controls advertised")
 	}
 }

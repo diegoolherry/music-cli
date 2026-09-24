@@ -11,6 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/diegoolherry/music-cli/internal/library"
+	"github.com/diegoolherry/music-cli/internal/manage"
 	"github.com/diegoolherry/music-cli/internal/playback"
 	"github.com/diegoolherry/music-cli/internal/ui"
 )
@@ -35,7 +36,10 @@ func run(args []string, launch func(string) error, probePaths func([]string) err
 func launchUI(root string) error {
 	snapshot, scanErr := library.Scan(root)
 	engine := playback.New(&playback.Audio{})
-	result, runErr := tea.NewProgram(ui.New(root, snapshot, scanErr, engine)).Run()
+	model := ui.New(root, snapshot, scanErr, engine)
+	model.Manager = manage.New(root, engine.ActivePath)
+	model.Scan = library.Scan
+	result, runErr := tea.NewProgram(model).Run()
 	if stopErr := engine.Stop(); stopErr != nil {
 		return fmt.Errorf("release playback: %w", stopErr)
 	}
